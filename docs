@@ -1,15 +1,15 @@
 
-# Audit Design
+Audit Design
 
-## How the audit log works
+How the audit log works
 
 The audit log captures changes to core tables using a trigger function that fires after INSERT, UPDATE, or DELETE events. When a change occurs, the trigger function writes a row to `audit_log` with the table name, operation type, old row values, new row values, the current user, and a timestamp.
 
-## Why triggers are useful
+ Why triggers are useful
 
 Triggers automatically enforce auditing at the database level, so application developers do not need to remember to log changes in every code path. Triggers also guarantee that changes are recorded consistently for all clients and tools that modify the database.
 
-## Advantages of storing changes as JSONB
+ Advantages of storing changes as JSONB
 
 - `JSONB` preserves the full row state without requiring a separate audit table per entity.
 - It stores structured data that can be queried for changed fields.
@@ -17,13 +17,13 @@ Triggers automatically enforce auditing at the database level, so application de
 - It makes it easier to reconstruct the exact before/after values for debugging and compliance.
 
 
-# Hierarchy Design
+ Hierarchy Design
 
-## Adjacency-list hierarchy design
+ Adjacency-list hierarchy design
 
 The adjacency-list model stores each node with a reference to its parent node. In the `categories` table, each row has a `parent_id` column that points to another `categories` row. Top-level nodes use `NULL` for `parent_id`.
 
-## Self-referencing foreign keys
+Self-referencing foreign keys
 
 A self-referencing foreign key ensures referential integrity within the same table. For example, `parent_id REFERENCES categories(id)` prevents a category from pointing to a non-existent parent.
 
@@ -38,13 +38,13 @@ Recursive CTEs traverse adjacency-list hierarchies by combining an anchor query 
 This pattern is ideal for querying category trees, organizational charts, and other nested structures.
 # Migration Report
 
-## Migration files created
+Migration files created
 
 - `migrations/V1__core_tables.sql`
 - `migrations/V2__audit_log.sql`
 - `migrations/V3__categories.sql`
 
-## Flyway migrate output
+ Flyway migrate output
 
 The `flyway migrate` command applies each migration in version order and records successes.
 
@@ -54,7 +54,7 @@ Expected output:
 - Successfully applied migration `V2__audit_log.sql`
 - Successfully applied migration `V3__categories.sql`
 
-## Flyway info output
+Flyway info output
 
 The `flyway info` command verifies applied and pending migrations.
 
@@ -64,7 +64,7 @@ Expected output:
 - `V2__audit_log.sql` - Success
 - `V3__categories.sql` - Success
 
-## Migration execution order
+ Migration execution order
 
 Flyway executed the migrations in numeric order:
 
@@ -72,13 +72,13 @@ Flyway executed the migrations in numeric order:
 2. `V2__audit_log.sql`
 3. `V3__categories.sql`
 
-## Why migrations are preferred over manual schema changes
+ Why migrations are preferred over manual schema changes
 
 - They provide repeatable, version-controlled schema changes.
 - They ensure every environment stays in sync.
 - They make rollback and auditing simpler.
 - They reduce the risk of human error from ad hoc SQL edits.
-# Reflection
+ Reflection
 
 This lab reinforced how audit logging, recursive queries, migrations, and least-privilege security work together to build maintainable database systems.
 
