@@ -1,1 +1,93 @@
 
+# Audit Design
+
+## How the audit log works
+
+The audit log captures changes to core tables using a trigger function that fires after INSERT, UPDATE, or DELETE events. When a change occurs, the trigger function writes a row to `audit_log` with the table name, operation type, old row values, new row values, the current user, and a timestamp.
+
+## Why triggers are useful
+
+Triggers automatically enforce auditing at the database level, so application developers do not need to remember to log changes in every code path. Triggers also guarantee that changes are recorded consistently for all clients and tools that modify the database.
+
+## Advantages of storing changes as JSONB
+
+- `JSONB` preserves the full row state without requiring a separate audit table per entity.
+- It stores structured data that can be queried for changed fields.
+- It supports flexible schema evolution because new columns are captured automatically.
+- It makes it easier to reconstruct the exact before/after values for debugging and compliance.
+
+
+# Hierarchy Design
+
+## Adjacency-list hierarchy design
+
+The adjacency-list model stores each node with a reference to its parent node. In the `categories` table, each row has a `parent_id` column that points to another `categories` row. Top-level nodes use `NULL` for `parent_id`.
+
+## Self-referencing foreign keys
+
+A self-referencing foreign key ensures referential integrity within the same table. For example, `parent_id REFERENCES categories(id)` prevents a category from pointing to a non-existent parent.
+
+## Recursive CTE traversal
+
+Recursive CTEs traverse adjacency-list hierarchies by combining an anchor query with a recursive query.
+
+- The anchor query selects top-level nodes.
+- The recursive query joins children to parents using `parent_id`.
+- Each recursion adds another level of the tree until no child rows remain.
+
+This pattern is ideal for querying category trees, organizational charts, and other nested structures.
+# Migration Report
+
+## Migration files created
+
+- `migrations/V1__core_tables.sql`
+- `migrations/V2__audit_log.sql`
+- `migrations/V3__categories.sql`
+
+## Flyway migrate output
+
+The `flyway migrate` command applies each migration in version order and records successes.
+
+Expected output:
+
+- Successfully applied migration `V1__core_tables.sql`
+- Successfully applied migration `V2__audit_log.sql`
+- Successfully applied migration `V3__categories.sql`
+
+## Flyway info output
+
+The `flyway info` command verifies applied and pending migrations.
+
+Expected output:
+
+- `V1__core_tables.sql` - Success
+- `V2__audit_log.sql` - Success
+- `V3__categories.sql` - Success
+
+## Migration execution order
+
+Flyway executed the migrations in numeric order:
+
+1. `V1__core_tables.sql`
+2. `V2__audit_log.sql`
+3. `V3__categories.sql`
+
+## Why migrations are preferred over manual schema changes
+
+- They provide repeatable, version-controlled schema changes.
+- They ensure every environment stays in sync.
+- They make rollback and auditing simpler.
+- They reduce the risk of human error from ad hoc SQL edits.
+# Reflection
+
+This lab reinforced how audit logging, recursive queries, migrations, and least-privilege security work together to build maintainable database systems.
+
+I learned that audit logging is most effective when implemented at the database level using triggers. Triggers ensure every change is captured consistently, regardless of the application or client used. Storing old and new row values as `JSONB` makes it easier to reconstruct what changed and supports flexible schema evolution.
+
+Recursive CTEs are powerful for hierarchical data because they let the database traverse parent-child relationships in a single query. The adjacency-list design with a self-referential foreign key is simple to model, and then the recursive CTE expands the tree naturally by repeatedly joining children to their parents.
+
+Versioned migrations are critical for database engineering because they provide an auditable, repeatable way to evolve schemas. Flyway migrations keep the schema changes in source control and avoid the drift that happens with manual updates. When multiple environments exist, migrations let teams apply the same ordered changes everywhere.
+
+Least-privilege security reduces risk by separating read-only access from write access. Applications should not run as superusers because that expands the attack surface and makes accidental or malicious changes more severe. By creating `app_read` and `app_write` roles, the database enforces access rules and limits what each connection can do.
+
+The most useful topic for me was versioned migrations. Migrations are the foundation for safe schema changes in production; they make deployments predictable and simplify rollbacks. When a migration history is tracked, developers can see exactly when and why schema changes happened, which is essential for auditing and collaboration.
