@@ -1,6 +1,6 @@
-# Audit Results
+ Audit Results
 
-## Audit log query output
+ Audit log query output
 
 The audit log captures every INSERT, UPDATE, and DELETE on the core tables.
 
@@ -11,7 +11,7 @@ Example output from `audit/audit_test.sql`:
 | students    | DELETE | Kofi M.    |           | postgres   | 2026-08-12 12:00:00+00   |
 | students    | UPDATE | Kofi       | Kofi M.   | postgres   | 2026-08-12 11:59:35+00   |
 
-## Changes captured
+ Changes captured
 
 - `tbl`: the table name where the change occurred
 - `op`: the operation type (INSERT, UPDATE, DELETE)
@@ -20,7 +20,7 @@ Example output from `audit/audit_test.sql`:
 - `changed_by`: database user who performed the change
 - `at`: timestamp of the operation
 
-## Differences between old and new values
+ Differences between old and new values
 
 For UPDATE operations, the audit trail stores both `old_row` and `new_row`, allowing comparison of changed fields.
 
