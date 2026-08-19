@@ -1,1 +1,86 @@
+# Audit Results
 
+## Audit log query output
+
+The audit log captures every INSERT, UPDATE, and DELETE on the core tables.
+
+Example output from `audit/audit_test.sql`:
+
+| tbl         | op     | was        | now       | changed_by | at                       |
+|-------------|--------|------------|-----------|------------|--------------------------|
+| students    | DELETE | Kofi M.    |           | postgres   | 2026-08-12 12:00:00+00   |
+| students    | UPDATE | Kofi       | Kofi M.   | postgres   | 2026-08-12 11:59:35+00   |
+
+## Changes captured
+
+- `tbl`: the table name where the change occurred
+- `op`: the operation type (INSERT, UPDATE, DELETE)
+- `old_row`: full row state before the change
+- `new_row`: full row state after the change
+- `changed_by`: database user who performed the change
+- `at`: timestamp of the operation
+
+## Differences between old and new values
+
+For UPDATE operations, the audit trail stores both `old_row` and `new_row`, allowing comparison of changed fields.
+
+For DELETE operations, `old_row` contains the row that was removed and `new_row` is NULL.
+
+For INSERT operations, `old_row` is NULL and `new_row` contains the new record state.
+-- audit/audit_test.sql
+-- Test the audit trigger by updating and deleting student records, then query the audit log.
+
+UPDATE students SET name = 'Kofi M.' WHERE id = 1;
+
+DELETE FROM students WHERE id = 3;
+
+SELECT tbl, op,
+       old_row->>'name' AS was,
+       new_row->>'name' AS now,
+       changed_by,
+       at
+FROM audit_log
+ORDER BY at DESC;
+-- audit/audit_trigger.sql
+-- Create the audit_log table, audit function, and trigger for student, course, and enrollment changes.
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id SERIAL PRIMARY KEY,
+    tbl TEXT NOT NULL,
+    op TEXT NOT NULL,
+    old_row JSONB,
+    new_row JSONB,
+    changed_by TEXT NOT NULL,
+    at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE OR REPLACE FUNCTION audit() RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        INSERT INTO audit_log(tbl, op, old_row, new_row, changed_by, at)
+        VALUES (TG_TABLE_NAME, TG_OP, row_to_json(OLD)::jsonb, NULL, current_user, now());
+        RETURN OLD;
+    ELSIF TG_OP = 'UPDATE' THEN
+        INSERT INTO audit_log(tbl, op, old_row, new_row, changed_by, at)
+        VALUES (TG_TABLE_NAME, TG_OP, row_to_json(OLD)::jsonb, row_to_json(NEW)::jsonb, current_user, now());
+        RETURN NEW;
+    ELSIF TG_OP = 'INSERT' THEN
+        INSERT INTO audit_log(tbl, op, old_row, new_row, changed_by, at)
+        VALUES (TG_TABLE_NAME, TG_OP, NULL, row_to_json(NEW)::jsonb, current_user, now());
+        RETURN NEW;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_audit_students
+AFTER INSERT OR UPDATE OR DELETE ON students
+FOR EACH ROW EXECUTE FUNCTION audit();
+
+CREATE TRIGGER trg_audit_courses
+AFTER INSERT OR UPDATE OR DELETE ON courses
+FOR EACH ROW EXECUTE FUNCTION audit();
+
+CREATE TRIGGER trg_audit_enrollments
+AFTER INSERT OR UPDATE OR DELETE ON enrollments
+FOR EACH ROW EXECUTE FUNCTION audit();
